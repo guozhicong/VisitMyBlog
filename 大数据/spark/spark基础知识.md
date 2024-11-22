@@ -79,7 +79,9 @@ object Spark02_WorldCount {
 
     var wordToOne = words.map( word => (word, 1))
 
-    // 可以将3-4步的分组和聚合 合并为一步 ： wordToOne.reduceByKey((x, y) => x + y)
+    // 可以将3-4步的分组和聚合 合并为一步 ： 
+    // wordToOne.reduceByKey((x, y) => x + y)
+    
     // 3. 将单词进行分组，便于统计
     val wordGroup: RDD[(String, Iterable[(String, Int)])] = wordToOne.groupBy(t => t._1)
     // 4. 统计各个分组的数量
@@ -93,7 +95,6 @@ object Spark02_WorldCount {
       }
     }
     
-    
     // 5. 输出
     val tuples = wordCount.collect()
     tuples.foreach(println)
@@ -102,5 +103,4 @@ object Spark02_WorldCount {
     sc.stop()
   }
 }
-
 ```
