@@ -147,3 +147,134 @@ fio -filename=/dev/sde -direct=1 -iodepth 1 -thread -rw=randwrite -ioengine=psyn
     
 
 ```
+
+----
+## linux系统中如何删除lvm分区
+https://blog.csdn.net/m0_37253968/article/details/110440911
+1. lvdisplay 查询到的LV Path用于后面的解除挂载
+```shell
+ --- Logical volume ---
+  LV Path                /dev/openeuler_hostname43b8h/home
+  LV Name                home
+  VG Name                openeuler_hostname43b8h
+  LV UUID                lzsRw2-ZNs6-omqW-eg33-v7Zq-ZRqZ-2xldSW
+  LV Write Access        read/write
+  LV Creation host, time hostname43b8h.foreman.pxe, 2024-11-26 11:56:19 +0000
+  LV Status              available
+  # open                 1
+  LV Size                <5.19 TiB
+  Current LE             1359434
+  Segments               5
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     8192
+  Block device           253:2
+```
+2. umount /dev/openeuler_hostname43b8h/home
+3. 再删除逻辑卷，删除语法：lvremove  逻辑卷名，删除完成后再查看逻辑卷发现已经删除完成了
+```shell
+[root@hostname43b8h /]# lvremove /dev/openeuler_hostname43b8h/home
+Do you really want to remove active logical volume openeuler_hostname43b8h/home? [y/n]: y
+  Logical volume "home" successfully removed
+  
+[root@hostname43b8h /]# lvdisplay  
+# /dev/openeuler_hostname43b8h/home 逻辑卷已删除
+```
+## 删除磁盘分区
+1. lsblk
+```shell
+[root@hostname43b8h /]# lsblk 
+NAME                             MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sda                                8:0    0   1.1T  0 disk 
+├─sda1                             8:1    0   200M  0 part /boot/efi
+├─sda2                             8:2    0     1G  0 part /boot
+└─sda3                             8:3    0   1.1T  0 part 
+  └─openeuler_hostname43b8h-swap 253:1    0     4G  0 lvm  [SWAP]
+sdb                                8:16   0   1.1T  0 disk 
+└─sdb1                             8:17   0   1.1T  0 part 
+sdc                                8:32   0   1.1T  0 disk 
+└─sdc1                             8:33   0   1.1T  0 part 
+sdd                                8:48   0   1.1T  0 disk 
+└─sdd1                             8:49   0   1.1T  0 part 
+sde                                8:64   0 894.3G  0 disk 
+└─sde1                             8:65   0 894.3G  0 part 
+  └─openeuler_hostname43b8h-root 253:0    0    50G  0 lvm  /
+```
+
+2. fdisk /dev/sdb
+```shell
+# 输入d后再敲w保存
+```
+3. lsblk 验证
+```shell
+[root@hostname43b8h /]# lsblk 
+NAME                             MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sda                                8:0    0   1.1T  0 disk 
+├─sda1                             8:1    0   200M  0 part /boot/efi
+├─sda2                             8:2    0     1G  0 part /boot
+└─sda3                             8:3    0   1.1T  0 part 
+  └─openeuler_hostname43b8h-swap 253:1    0     4G  0 lvm  [SWAP]
+sdb                                8:16   0   1.1T  0 disk 
+sdc                                8:32   0   1.1T  0 disk 
+sdd                                8:48   0   1.1T  0 disk 
+sde                                8:64   0 894.3G  0 disk 
+└─sde1                             8:65   0 894.3G  0 part 
+  └─openeuler_hostname43b8h-root 253:0    0    50G  0 lvm  /
+[root@hostname43b8h /]# 
+```
+## 格式化磁盘
+mkfs.xfs -f /dev/sdb
+
+## fio测试
+### JBOD
+```shell
+JBOD 顺序读:
+fio -filename=/dev/sdb -direct=1 -iodepth 1 -thread -rw=read -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
+  read: IOPS=9182, BW=143MiB/s 
+JBOD 随机读:
+fio -filename=/dev/sdb -direct=1 -iodepth 1 -thread -rw=randread -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
+  read: IOPS=185, BW=2961KiB/s
+  read: IOPS=647, BW=10.1MiB/s 
+JBOD 顺序写:
+fio -filename=/dev/sdb -direct=1 -iodepth 1 -thread -rw=write -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
+  write: IOPS=2163, BW=33.8MiB/s
+  write: IOPS=2598, BW=40.6MiB/s
+JBOD 随机写:
+fio -filename=/dev/sdb -direct=1 -iodepth 1 -thread -rw=randwrite -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
+  write: IOPS=723, BW=11.3MiB/s
+```
+
+### 单盘RAID0 （SAS3408卡： 无缓存）
+```shell
+storcli64 /c0/e64/s3 set good force # 需要将磁盘从JBOD状态修改为UGood状态才能组raid0 
+storcli64 /c0 add vd r0 drives=64:3 # slot槽位是通过SN序列号定位的lsblk -o NAME,SERIAL和storcli64 /c0/e64/s3 show all命令确定
+# 此时lsblk会出现新的盘（也可能和之前的盘名相同）
+storcli64 /c0/v0 start init
+```
+
+
+```shell
+JBOD 顺序读:
+fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=read -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
+  read: IOPS=9170, BW=143MiB/s
+JBOD 随机读:
+fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=randread -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
+  read: IOPS=476, BW=7622KiB/s
+  read: IOPS=647, BW=10.1MiB/s
+JBOD 顺序写:
+fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=write -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
+  write: IOPS=2159, BW=33.7MiB/s
+  write: IOPS=2186, BW=34.2MiB/s 
+JBOD 随机写:
+fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=randwrite -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
+  write: IOPS=720, BW=11.3MiB/s
+  
+```
+
+
+## 华为RAID卡 用户指南
+> SAS3408iMR
+
+https://support.huawei.com/enterprise/zh/doc/EDOC1100048779/62aa8740
+
+
