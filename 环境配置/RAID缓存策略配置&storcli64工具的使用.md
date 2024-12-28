@@ -250,23 +250,24 @@ storcli64 /c0/e64/s3 set good force # 需要将磁盘从JBOD状态修改为UGood
 storcli64 /c0 add vd r0 drives=64:3 # slot槽位是通过SN序列号定位的lsblk -o NAME,SERIAL和storcli64 /c0/e64/s3 show all命令确定
 # 此时lsblk会出现新的盘（也可能和之前的盘名相同）
 storcli64 /c0/v0 start init
+# 之后需要格式化磁盘，并挂载目录
 ```
 
 
 ```shell
-JBOD 顺序读:
-fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=read -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
+JBOD 顺序读
+fio -filename=/dev/sde -direct=1 -iodepth 1 -thread -rw=read -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
   read: IOPS=9170, BW=143MiB/s
 JBOD 随机读:
-fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=randread -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
+fio -filename=/dev/sde -direct=1 -iodepth 1 -thread -rw=randread -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest
   read: IOPS=476, BW=7622KiB/s
   read: IOPS=647, BW=10.1MiB/s
 JBOD 顺序写:
-fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=write -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
+fio -filename=/dev/sde -direct=1 -iodepth 1 -thread -rw=write -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
   write: IOPS=2159, BW=33.7MiB/s
   write: IOPS=2186, BW=34.2MiB/s 
 JBOD 随机写:
-fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=randwrite -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
+fio -filename=/dev/sde -direct=1 -iodepth 1 -thread -rw=randwrite -ioengine=psync -bs=16k -size=2G -numjobs=10 -runtime=300 -group_reporting -name=mytest -allow_mounted_write=1
   write: IOPS=720, BW=11.3MiB/s
   
 ```
@@ -276,5 +277,4 @@ fio -filename=/dev/sdf -direct=1 -iodepth 1 -thread -rw=randwrite -ioengine=psyn
 > SAS3408iMR
 
 https://support.huawei.com/enterprise/zh/doc/EDOC1100048779/62aa8740
-
 

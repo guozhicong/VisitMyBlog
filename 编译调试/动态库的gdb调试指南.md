@@ -10,6 +10,7 @@ tar -zxvf curl-7_60_0
 cd curl-curl-7_60_0
 ./buildconf
 ./configure --prefix=/usr/local/curl  # 添加--enable-debug即可
+# 如果是cmake 也可以像cmake -DCMAKE_BUILD_TYPE=Debug .该命令一样添加-DCMAKE_BUILD_TYPE=Debug
 make && make install
 ```
 
