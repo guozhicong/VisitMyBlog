@@ -100,6 +100,7 @@ Average:        0     65998      0.00     31.25  stress
 ```
 
 ### CPU 使用率过高的定位方法
+#### 简单应用的使用率过高问题排查
 1. perf top 查看热点函数
 ```shell
 perf top -g -p 21515 # -p 可以指定进程
@@ -116,6 +117,26 @@ total 420
 
 [root@hostname-zb9ta ~]# perf report  # 展示类似于perf top的报告
 ```
+#### CPU使用率高，但是top找不到对应的进程————短时进程分析
+1. top 和 pidstat -u 1 不一定能查询到短时的进程
+2. 但是perf record -g 可以记录到； 或者使用 execsnoop（arm上好像没有）
+```shell
+# pstree 查询进程的父进程，以及进程之间的关系（或者是这个进程是怎么被启动的）
+# 数字2 表示有2个进程
+[root@hostname-zb9ta ~]# pstree | grep stress
+        |-sshd---sshd---sshd-+-bash---stress---2*[stress]
+```
 
+#### 系统中大量的不可中断进程和僵尸进程
+> top命令下的进程状态
+- R （Running / Runnable）
+- D （Disk Sleep） 不可中断状态睡眠，一般表示进程正在和硬件交互，切交互过程不允许被其他进程或中断打断
+- Z （Zombie） 进程已经结束，但是父进程还没有回收它的资源
+- S （Interruptible Sleep） 可中断状态睡眠，表示进程因为等待某个事件而被系统挂起。
+- I （Idle）
 
+> 额外的两个进程状态
+
+- T （Stopped/Traced） 暂停（比如发送个一个SIGSTOP信号给进程）或者跟踪状态（gdb调试的时候）：
+- X （Dead） 进程已经消亡，无法在top中查看
 
